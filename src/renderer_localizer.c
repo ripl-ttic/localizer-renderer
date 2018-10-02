@@ -26,15 +26,6 @@
 #define RENDERER_NAME "Localize"
 
 #define PARAM_REINITIALIZE "Reinitialize"
-#define ADD_PERSON "Add Person"
-#define PUBLISH_VALUE "Publish Value"
-#define LOOK_FOR_PERSON "Look for Person"
-#define PAUSE_SIMULATION "Pause Simulation"
-#define RESUME_SIMULATION "Resume Simulation"
-#define START_FOLLOWING "Start Following"
-#define STOP_FOLLOWING "Stop Following"
-#define CLEAR_PEOPLE "Clear People"
-#define PERSON_INFRONT "Person in front"
 
 #define DRAW_PERSIST_SEC 4
 #define VARIANCE_THETA bot_to_radians(30.0)
@@ -62,7 +53,7 @@ struct _RendererLocalize {
     BotGtkParamWidget *pw;
 
     int dragging;
-    int active; //1 = relocalize, 2 = set person location
+    int active; //1 = relocalize
     point2d_t drag_start_local;
     point2d_t drag_finish_local;
 
@@ -98,7 +89,6 @@ _draw (BotViewer *viewer, BotRenderer *renderer)
         glPopMatrix();
     }
     if(self->size_of_pose_values > 0){
-
 
         for(int i=0; i < self->size_of_pose_values; i++){
 
@@ -191,105 +181,6 @@ mouse_press (BotViewer *viewer, BotEventHandler *ehandler, const double ray_star
     return 1;
 }
 
-void clear_people(RendererLocalize *self){
-    ripl_localize_reinitialize_cmd_t msg;
-    msg.utime = bot_timestamp_now();
-    msg.mean[0] = 0;
-    msg.mean[1] = 0;
-    msg.mean[2] = 0;
-
-    msg.variance[0] = 0;
-    msg.variance[1] = 0;
-    msg.variance[2] = 0;
-    ripl_localize_reinitialize_cmd_t_publish(self->lcm, "CLEAR_PEOPLE_CHANNEL", &msg);
-}
-
-void send_simulator_msg(RendererLocalize *self, int state){
-    //state = 0 : pause
-    //state = 1 : resume
-
-    //we should prob send speed up/ slow down messages as well
-
-    ripl_simulator_cmd_t msg;
-    msg.timestamp = bot_timestamp_now();
-    msg.command = state;
-    ripl_simulator_cmd_t_publish(self->lcm, "SIMULATOR_CMD", &msg);
-}
-
-static
-void add_value_button(GtkWidget *button __attribute__ ((unused)),
-                      gpointer user_data __attribute__ ((unused)))
-{
-    RendererLocalize *self = (RendererLocalize*) user_data;
-    char *errs;
-    char name[100];
-
-    double score = gtk_range_get_value((GTK_RANGE(self->score_entry)));
-
-    fprintf(stderr, "Pose : %f,%f,%f => %f\n", self->particle_mean.x, self->particle_mean.y, self->theta, score);
-
-    ripl_pose_value_t msg;
-    msg.utime = bot_timestamp_now();
-    msg.x = self->particle_mean.x;
-    msg.y = self->particle_mean.y;
-    msg.theta = self->theta;
-    msg.score = score;
-
-    //this should be added to a list and displayed
-
-    ripl_pose_value_t_publish(self->lcm, "POSE_VALUE", &msg);
-
-    self->pose_values = (pose_value *) realloc(self->pose_values, (self->size_of_pose_values +1) * sizeof(pose_value));
-
-    self->pose_values[self->size_of_pose_values].xytheta[0] = self->particle_mean.x;
-    self->pose_values[self->size_of_pose_values].xytheta[1] = self->particle_mean.y;
-    self->pose_values[self->size_of_pose_values].xytheta[2] = self->theta;
-    self->pose_values[self->size_of_pose_values].score = score;
-
-    self->size_of_pose_values++;
-
-    gtk_widget_destroy(self->score_entry);
-    gtk_widget_destroy(self->value_dialog);
-
-}
-
-
-void start_ask_value(RendererLocalize *self)
-{
-    fprintf(stderr, "Creating Dialog\n");
-    //just ask for a score
-    self->score_entry = gtk_hscale_new_with_range(-10, 10, 0.5);
-
-    GtkWidget *vbox, *hbox, *name_label, *button;
-    //remember to destroy
-    self->value_dialog = gtk_dialog_new();
-    vbox = gtk_vbox_new(FALSE, 0);
-    hbox = gtk_hbox_new(FALSE, 0);
-    gtk_box_pack_start (GTK_BOX (GTK_DIALOG (self->value_dialog)->vbox),
-                        vbox, TRUE, TRUE, 0);
-    name_label = gtk_label_new("Enter Score for Pose: ");
-    gtk_box_pack_start (GTK_BOX (vbox), name_label, TRUE, TRUE, 0);
-    gtk_box_pack_start (GTK_BOX(vbox),  self->score_entry, TRUE, TRUE, 0);
-
-    button = gtk_button_new_with_label("OK");
-    gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
-
-    gtk_signal_connect(GTK_OBJECT(button), "clicked",
-                       (GtkSignalFunc)add_value_button, self);
-
-    button = gtk_button_new_with_label("Cancel");
-    gtk_box_pack_start(GTK_BOX(hbox), button, TRUE, TRUE, 5);
-
-    gtk_box_pack_start (GTK_BOX(vbox),  hbox, TRUE, TRUE, 0);
-
-    gtk_signal_connect_object(GTK_OBJECT(button),
-                              "clicked", (GtkSignalFunc)gtk_widget_destroy,
-                              (gpointer)self->value_dialog);
-    self->active = 0;
-
-    gtk_widget_show_all(self->value_dialog);
-}
-
 static int mouse_release(BotViewer *viewer, BotEventHandler *ehandler,
                          const double ray_start[3], const double ray_dir[3],
                          const GdkEventButton *event)
@@ -298,10 +189,6 @@ static int mouse_release(BotViewer *viewer, BotEventHandler *ehandler,
 
     if (self->dragging) {
         self->dragging = 0;
-    }
-    if (self->active == 3){
-        //ask for value
-        start_ask_value(self);
     }
 
     if (self->active != 0 && self->active < 3) {
@@ -322,12 +209,6 @@ static int mouse_release(BotViewer *viewer, BotEventHandler *ehandler,
             fprintf(stderr, "Reinitializing \n");
             ripl_localize_reinitialize_cmd_t_publish(self->lcm,
                                                      "LOCALIZE_REINITIALIZE", &msg);
-        }
-        else if (self->active == 2){
-            //clear the current location
-            clear_people(self);
-            //send new location
-            ripl_localize_reinitialize_cmd_t_publish(self->lcm, "CREATE_PEOPLE_CHANNEL", &msg);
         }
 
         bot_viewer_set_status_bar_message(self->viewer, "");
@@ -371,15 +252,6 @@ void activate(RendererLocalize *self, int type)
         bot_viewer_set_status_bar_message(self->viewer,
                                           "Click and drag to initialize new particles");
     }
-    if(type==2){
-        bot_viewer_set_status_bar_message(self->viewer,
-                                          "Click and drag to initialize new person");
-    }
-    if(type==3){
-        bot_viewer_set_status_bar_message(self->viewer,
-                                          "Click and drag to initialize to add new training example");
-    }
-
 }
 
 static int key_press (BotViewer *viewer, BotEventHandler *ehandler,
@@ -408,64 +280,7 @@ static void on_param_widget_changed(BotGtkParamWidget *pw, const char *name, voi
         bot_viewer_request_pick (self->viewer, &(self->ehandler));
         activate(self, 1);
     }
-    if(!strcmp(name, ADD_PERSON)) {
-        fprintf(stderr,"Clicked Activate - Set person Location\n");
-        bot_viewer_request_pick (self->viewer, &(self->ehandler));
-        activate(self, 2);
-    }
-    if(!strcmp(name, PUBLISH_VALUE)) {
-        fprintf(stderr,"Clicked Activate - Add training example\n");
-        bot_viewer_request_pick (self->viewer, &(self->ehandler));
-        activate(self, 3);
-    }
 
-    if(!strcmp(name, CLEAR_PEOPLE)) {
-        fprintf(stderr,"Clearing People\n");
-        bot_viewer_request_pick (self->viewer, &(self->ehandler));
-        clear_people(self);
-    }
-
-    if(!strcmp(name, PAUSE_SIMULATION)) {
-        fprintf(stderr,"Pausing Simulation\n");
-        send_simulator_msg(self, 0);
-    }
-
-    if(!strcmp(name, RESUME_SIMULATION)) {
-        fprintf(stderr,"Resuming Simulation\n");
-        send_simulator_msg(self, 1);
-    }
-
-    if(!strcmp(name, START_FOLLOWING)) {
-        fprintf(stderr,"Start Following\n");
-        ripl_speech_cmd_t msg;
-        msg.cmd_type = "FOLLOWER";
-        msg.cmd_property = "START_FOLLOWING";
-        ripl_speech_cmd_t_publish(self->lcm, "PERSON_TRACKER", &msg);
-    }
-
-     if(!strcmp(name, STOP_FOLLOWING)) {
-        fprintf(stderr,"Stop Following\n");
-        ripl_speech_cmd_t msg;
-        msg.cmd_type = "FOLLOWER";
-        msg.cmd_property = "IDLE";
-        ripl_speech_cmd_t_publish(self->lcm, "PERSON_TRACKER", &msg);
-    }
-
-    if(!strcmp(name, LOOK_FOR_PERSON)) {
-        fprintf(stderr,"Clicked Activate - Look for person\n");
-        ripl_speech_cmd_t msg;
-        msg.cmd_type = "TRACKER";
-        msg.cmd_property = "ASKED_TO_FRONT";
-        ripl_speech_cmd_t_publish(self->lcm, "PERSON_TRACKER", &msg);
-    }
-    if(!strcmp(name, PERSON_INFRONT)) {
-        fprintf(stderr,"Clicked Activate - Person is in front\n");
-        ripl_person_tracking_cmd_t msg;
-        msg.utime = bot_timestamp_now();
-        msg.command = RIPL_PERSON_TRACKING_CMD_T_CMD_PERSON_IN_FRONT;
-        msg.sender = RIPL_PERSON_TRACKING_CMD_T_SENDER_DM;
-        ripl_person_tracking_cmd_t_publish(self->lcm, "PERSON_TRACKING_CMD", &msg);
-    }
 }
 
 static void
@@ -497,38 +312,11 @@ BotRenderer *renderer_localize_new (BotViewer *viewer, int render_priority, lcm_
 
     bot_viewer_add_event_handler(viewer, &self->ehandler, render_priority);
 
-    self->lcm = lcm; //globals_get_lcm_full(NULL,1);
-
+    self->lcm = lcm;
 
     self->pw = BOT_GTK_PARAM_WIDGET(bot_gtk_param_widget_new());
 
     bot_gtk_param_widget_add_buttons(self->pw, PARAM_REINITIALIZE, NULL);
-
-    //add clear people and add people button
-    bot_gtk_param_widget_add_separator(self->pw, "Person Tracker");
-
-    bot_gtk_param_widget_add_buttons(self->pw, LOOK_FOR_PERSON, NULL);
-
-    bot_gtk_param_widget_add_buttons(self->pw, PERSON_INFRONT, NULL);
-
-    bot_gtk_param_widget_add_separator(self->pw, "Person Follower");
-
-    bot_gtk_param_widget_add_buttons(self->pw, START_FOLLOWING, NULL);
-
-    bot_gtk_param_widget_add_buttons(self->pw, STOP_FOLLOWING, NULL);
-
-    bot_gtk_param_widget_add_separator(self->pw, "Simulator");
-
-    bot_gtk_param_widget_add_buttons(self->pw, ADD_PERSON, NULL);
-
-    bot_gtk_param_widget_add_buttons(self->pw, PUBLISH_VALUE, NULL);
-
-    bot_gtk_param_widget_add_buttons(self->pw, CLEAR_PEOPLE, NULL);
-
-    //pause/resume simulation buttons
-    bot_gtk_param_widget_add_buttons(self->pw, PAUSE_SIMULATION, NULL);
-    bot_gtk_param_widget_add_buttons(self->pw, RESUME_SIMULATION, NULL);
-
 
     g_signal_connect(G_OBJECT(self->pw), "changed", G_CALLBACK(on_param_widget_changed), self);
     self->renderer.widget = GTK_WIDGET(self->pw);
