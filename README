@@ -7,7 +7,7 @@ templates.  The policies and templates can be found at:
 
 ====
 
-Name:         rrtstar-renderer
+Name:         localizer-renderer
 Maintainers:  Matthew Walter
 Summary:      FILL-ME-IN
 Description:
@@ -16,8 +16,7 @@ Description:
 Requirements:
   libbot2 (https://github.com/ripl-ttic/libbot2)
   lcm
-  rrtstar-lcmtypes (https://github.com/ripl-ttic/rrtstar-lcmtypes)
-  carmen-utils (https://github.com/ripl-ttic/carmen-utils)
+  localizer-lcmtypes (https://github.com/ripl-ttic/localizer)
   geom-utils (https://github.com/ripl-ttic/geom-utils)
 
 License:      FILL-ME-IN
