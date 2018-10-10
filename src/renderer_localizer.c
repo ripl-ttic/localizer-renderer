@@ -20,7 +20,6 @@
 //#include <carmen_utils/global.h>
 #include <geom_utils/geometry.h>
 
-#include <lcmtypes/hr_lcmtypes.h>
 #include <lcmtypes/ripl_localize_reinitialize_cmd_t.h>
 
 #define RENDERER_NAME "Localize"
