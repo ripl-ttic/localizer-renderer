@@ -20,7 +20,7 @@
 //#include <carmen_utils/global.h>
 #include <geom_utils/geometry.h>
 
-#include <lcmtypes/ripl_localize_reinitialize_cmd_t.h>
+#include <lcmtypes/localizer_reinitialize_cmd_t.h>
 
 #define RENDERER_NAME "Localize"
 
@@ -192,7 +192,7 @@ static int mouse_release(BotViewer *viewer, BotEventHandler *ehandler,
 
     if (self->active != 0 && self->active < 3) {
         // check drag points and publish
-        ripl_localize_reinitialize_cmd_t msg;
+        localizer_reinitialize_cmd_t msg;
         msg.utime = bot_timestamp_now();
         msg.mean[0] = self->particle_mean.x;
         msg.mean[1] = self->particle_mean.y;
@@ -206,7 +206,7 @@ static int mouse_release(BotViewer *viewer, BotEventHandler *ehandler,
         fprintf(stderr,"Localizer Button Released => Activate Value : %d\n", self->active);
         if(self->active == 1){
             fprintf(stderr, "Reinitializing \n");
-            ripl_localize_reinitialize_cmd_t_publish(self->lcm,
+            localizer_reinitialize_cmd_t_publish(self->lcm,
                                                      "LOCALIZE_REINITIALIZE", &msg);
         }
 
